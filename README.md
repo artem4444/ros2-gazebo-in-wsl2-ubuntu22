@@ -107,10 +107,11 @@ X11 (also called X Window System or simply X) is a windowing system protocol tha
 6. Build & Run
 
 
-# new ros2-ws
+# sourcing
+source ~/ros2_ws/install/setup.bash
 
-## sourcing
-`source /opt/ros/humble/setup.bash`
+source /opt/ros/humble/setup.bash
+
 we source so that:
 -shell would know where ROS2 tools are (ros2, colcon)
 -any process we launch inherits paths to find ROS2 libraries/packages
@@ -121,10 +122,10 @@ If you open a new terminal, you need to source again because it's a fresh shell 
 we need to source new packages after running colcon build
 
 
-## new package in ros2 ws
+# new package in ros2 ws
 
 
-## build the ws with colcon
+# build the ws with colcon
 
 
 # ros2 installations, dependencies management
@@ -174,3 +175,65 @@ bringup.launch.py typically chains/includes launch files from multiple packages
 RViz2 = Visualization Tool for Robot Descriptions
 
 URDF (robot model)  →  robot_state_publisher  →  RViz2 (renders it)
+
+
+# nodes, topics, messages
+in ROS2 each topic has exactly one message type
+
+```bash
+ros2 topic list -t
+ros2 node list
+rqt_graph
+
+```
+
+
+
+# Gazebo Harmonic installation
+APT (Advanced Package Tool) is a package management system used by Debian-based Linux distributions
+
+apt update refreshes the local package index — it downloads the latest list of available packages and their versions from the repositories configured on your system
+
+gnupg (GNU Privacy Guard)
+Encryption and signing tool — used to verify package authenticity
+
+lsb-release
+Linux Standard Base release tool — provides information about your Linux distribution.
+
+```bash
+# Install Gazebo Harmonic in WSL and Windows (Ubuntu 24.04 (22 in my case))
+# To install Gazebo, we need to perform the following steps. In the Ubuntu 24.04 WSL terminal type:
+
+sudo apt-get update
+sudo apt-get install lsb-release gnupg
+# Then type
+
+sudo curl https://packages.osrfoundation.org/gazebo.gpg --output /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
+sudo apt-get update
+sudo apt-get install gz-harmonic
+# This should install Gazebo Harmonic
+
+# Run Gazebo Simulations in Windows through WSL
+# To run the simulations, we need to type
+
+gz sim shapes.sdf
+
+```
+
+
+# ros-humble-ros-gz bridge
+sudo apt install ros-humble-ros-gz
+
+ros_gz_bridge = Generic message translator between ROS2 ↔ Gazebo
+Clock synchronization
+Sensor data (cameras, lidar)
+Simple commands (cmd_vel for mobile robots)
+Does NOT handle joint control for arms
+
+# gz_ros2_control
+
+ros2_control + gz_ros2_control = Joint control system
+gz_ros2_control plugin runs inside Gazebo, interfaces with simulated joints
+controller_manager loads controllers
+Controllers (e.g., joint_trajectory_controller) receive commands and move joints
