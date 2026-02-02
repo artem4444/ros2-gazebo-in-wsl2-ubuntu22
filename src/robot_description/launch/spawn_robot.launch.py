@@ -1,32 +1,37 @@
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration, Command
+from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
-from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
     # Package path
-    pkg_robot_description = FindPackageShare('robot_description')
-
-    # URDF file path
-    urdf_file = os.path.join(
-        FindPackageShare('robot_description').find('robot_description'),
-        'urdf', 'robot.urdf'
-    )
-
-    # Read URDF content
+    pkg_share = FindPackageShare('robot_description').find('robot_description')
+    
+    # Path to models directory (for Gazebo to find our SDF model)
+    models_path = os.path.join(pkg_share, 'models')
+    
+    # URDF file path (still needed for robot_state_publisher / RViz)
+    urdf_file = os.path.join(pkg_share, 'urdf', 'robot.urdf')
+    
+    # Read URDF content for robot_state_publisher
     with open(urdf_file, 'r') as file:
         robot_description_content = file.read()
+
+    # Set GZ_SIM_RESOURCE_PATH so Gazebo can find our model
+    gz_resource_path = SetEnvironmentVariable(
+        name='GZ_SIM_RESOURCE_PATH',
+        value=[os.environ.get('GZ_SIM_RESOURCE_PATH', ''), os.pathsep, models_path]
+    )
 
     # Launch arguments for spawn position
     x_arg = DeclareLaunchArgument('x', default_value='0.0', description='X position')
     y_arg = DeclareLaunchArgument('y', default_value='0.0', description='Y position')
-    z_arg = DeclareLaunchArgument('z', default_value='0.8', description='Z position (on table)')
+    z_arg = DeclareLaunchArgument('z', default_value='0.4', description='Z position (table surface)')
 
-    # Robot State Publisher - publishes TF transforms from URDF
+    # Robot State Publisher - publishes TF transforms from URDF (for RViz)
     robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
@@ -34,13 +39,13 @@ def generate_launch_description():
         output='screen'
     )
 
-    # Spawn robot in Gazebo
+    # Spawn robot in Gazebo using SDF model (with plugins!)
     spawn_robot = Node(
         package='ros_gz_sim',
         executable='create',
         arguments=[
             '-name', 'arm_5dof',
-            '-topic', 'robot_description',
+            '-file', os.path.join(models_path, 'arm_5dof', 'model.sdf'),
             '-x', LaunchConfiguration('x'),
             '-y', LaunchConfiguration('y'),
             '-z', LaunchConfiguration('z'),
@@ -57,6 +62,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        gz_resource_path,
         x_arg,
         y_arg,
         z_arg,

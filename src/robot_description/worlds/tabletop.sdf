@@ -2,6 +2,13 @@
 <sdf version="1.8">
   <world name="tabletop_world">
     
+    <!-- GUI camera position -->
+    <gui fullscreen="0">
+      <camera name="user_camera">
+        <pose>1.5 -1.5 1.2 0 0.4 2.35</pose>  <!-- x y z roll pitch yaw -->
+      </camera>
+    </gui>
+    
     <!-- Physics -->
     <physics name="1ms" type="ignored">
       <max_step_size>0.001</max_step_size>

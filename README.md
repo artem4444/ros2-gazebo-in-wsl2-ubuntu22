@@ -37,6 +37,21 @@ next session plan:
 - commit: added 5-DOF robotic arm in Gazebo {version}, simulated it’s interacting with mock 3d objects
 
 
+## 02.02
+
+MOGI-ROS week 3-4 gazebo integration section
+
+1. “”” what controller node we use to control robotic models inside the gazebo ? Is robotic arm control implemented right in the gazebo gui? is teleop_… ?
+- commit: in Gazebo controlled the robotic arm's joints using Joint Position Controller gui plugin, replaced mock objects simulated it’s interacting with mock 3d objects
+
+1. “”” how to control the robotic model inside the gazebo using ros2_control? via the ros-bridge?
+2. implement the ros2_control of the gazebo model
+- commit: controlled model of a robot in Gazebo with ros2_control via a bridge
+
+1. control the ros2_control itself with higher level sequence of positional commands (moveit2-like) from a file (later this will be a topic with messages: for now- file with hardcoded timestamps)
+- commit: coded a time-relative control of a robot in Gazebo
+
+
 
 # Testing a newly installed Ubuntu22
 
@@ -170,6 +185,43 @@ spawn.launch.py	Spawn robot into Gazebo
 
 bringup.launch.py typically chains/includes launch files from multiple packages
 
+## testing launch files separately
+
+example of 2 launch files integration
+
+world.launch.py
+      │
+      ▼
+┌─────────────────────────────┐
+│   Gazebo Server (gz sim)    │  ← Single running instance
+│   - Loads tabletop.sdf      │
+│   - Physics engine running  │
+│   - Listening for requests  │
+└─────────────────────────────┘
+      ▲
+      │
+spawn_robot.launch.py
+      │
+      ▼
+┌─────────────────────────────┐
+│   ros_gz_sim create node    │
+│   - Connects to gz server   │
+│   - Sends "spawn model"     │
+│     request via gz-transport│
+└─────────────────────────────┘
+
+
+
+## unified launches into simulation.launch.py
+```bash
+# Rebuild to install the new launch file
+cd ~/ros2_ws && colcon build --packages-select robot_description
+
+# Source and launch
+source install/setup.bash
+ros2 launch robot_description simulation.launch.py
+```
+
 
 # RViz2
 RViz2 = Visualization Tool for Robot Descriptions
@@ -221,6 +273,43 @@ gz sim shapes.sdf
 
 ```
 
+# launch Gazebo world
+
+```bash
+cd ~/ros2_ws
+colcon build --packages-select robot_description
+source install/setup.bash
+
+# Restart Gazebo and spawn
+ros2 launch robot_description world.launch.py
+# (new terminal)
+ros2 launch robot_description spawn_robot.launch.py
+
+```
+
+
+
+# control of the robotic model in Gazebo
+
+User Input (GUI/script/MoveIt2)
+    Joint Position Control gui plugin (in 3-dots menu)
+
+┌─────────────────────────────────────────────────────────────┐
+│                     GAZEBO HARMONIC                          │
+│                                                              │
+│   GUI JointControl Plugin (sliders)                          │
+│            │                                                 │
+│            ▼ (gz-transport)                                  │
+│   JointPositionController plugins (PID per joint)            │
+│            │                                                 │
+│            ▼                                                 │
+│   Gazebo Physics Engine → Joints move                        │
+│                                                              │
+│   JointStatePublisher plugin → publishes joint states        │
+└─────────────────────────────────────────────────────────────┘
+
+
+
 
 # ros-humble-ros-gz bridge
 sudo apt install ros-humble-ros-gz
@@ -231,7 +320,7 @@ Sensor data (cameras, lidar)
 Simple commands (cmd_vel for mobile robots)
 Does NOT handle joint control for arms
 
-# gz_ros2_control
+# gz_ros2_control plugin
 
 ros2_control + gz_ros2_control = Joint control system
 gz_ros2_control plugin runs inside Gazebo, interfaces with simulated joints
