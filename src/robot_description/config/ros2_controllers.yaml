@@ -1,0 +1,58 @@
+# ros2_controllers.yaml - Controller configuration for 5-DOF arm with gripper
+# Used by controller_manager to load and configure controllers
+
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz - controller update frequency
+
+    # List of controllers to load
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    gripper_controller:
+      type: position_controllers/GripperActionController
+
+
+# Arm trajectory controller - controls 5 DOF arm joints
+arm_controller:
+  ros__parameters:
+    joints:
+      - shoulder_pan_joint
+      - shoulder_lift_joint
+      - elbow_joint
+      - wrist_1_joint
+      - wrist_2_joint
+
+    command_interfaces:
+      - position
+
+    state_interfaces:
+      - position
+      - velocity
+
+    # Allow partial goals (not all joints need to be specified)
+    allow_partial_joints_goal: false
+
+    # Trajectory execution settings
+    state_publish_rate: 50.0  # Hz
+    action_monitor_rate: 20.0  # Hz
+
+    # Tolerances for trajectory following
+    constraints:
+      stopped_velocity_tolerance: 0.01
+      goal_time: 0.0  # 0 = no timeout
+
+
+# Gripper controller - parallel gripper with mimic joint
+gripper_controller:
+  ros__parameters:
+    joint: gripper_left_joint
+    
+    # Gripper action settings
+    goal_tolerance: 0.001  # position tolerance in meters
+    max_effort: 20.0       # max effort in Newtons
+    stall_velocity_threshold: 0.001
+    stall_timeout: 1.0

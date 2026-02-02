@@ -1,6 +1,15 @@
 <?xml version="1.0"?>
 <robot name="arm_5dof">
 
+  <!-- ==================== WORLD LINK (for fixing to ground) ==================== -->
+  <link name="world"/>
+  
+  <joint name="world_joint" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
   <!-- ==================== MATERIALS ==================== -->
   <material name="dark_grey">
     <color rgba="0.2 0.2 0.2 1.0"/>
@@ -363,5 +372,114 @@
       <inertia ixx="0.000001" ixy="0" ixz="0" iyy="0.000001" iyz="0" izz="0.000001"/>
     </inertial>
   </link>
+
+  <!-- ==================== ROS2 CONTROL ==================== -->
+  <ros2_control name="GazeboSimSystem" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+    
+    <!-- Arm joints - position controlled -->
+    <joint name="shoulder_pan_joint">
+      <command_interface name="position">
+        <param name="min">-3.14159</param>
+        <param name="max">3.14159</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    
+    <joint name="shoulder_lift_joint">
+      <command_interface name="position">
+        <param name="min">-3.14159</param>
+        <param name="max">3.14159</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    
+    <joint name="elbow_joint">
+      <command_interface name="position">
+        <param name="min">-3.14159</param>
+        <param name="max">3.14159</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    
+    <joint name="wrist_1_joint">
+      <command_interface name="position">
+        <param name="min">-3.14159</param>
+        <param name="max">3.14159</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    
+    <joint name="wrist_2_joint">
+      <command_interface name="position">
+        <param name="min">-3.14159</param>
+        <param name="max">3.14159</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    
+    <!-- Gripper joint - position controlled -->
+    <joint name="gripper_left_joint">
+      <command_interface name="position">
+        <param name="min">0</param>
+        <param name="max">0.03</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    
+    <!-- Mimic joint for right finger -->
+    <joint name="gripper_right_joint">
+      <param name="mimic">gripper_left_joint</param>
+      <param name="multiplier">1.0</param>
+      <command_interface name="position">
+        <param name="min">0</param>
+        <param name="max">0.03</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+
+  <!-- ==================== GAZEBO PLUGINS ==================== -->
+  <!-- gz_ros2_control plugin for Gazebo Harmonic -->
+  <!-- Note: CONTROLLER_CONFIG_PATH is replaced at launch time -->
+  <gazebo>
+    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <robot_param>robot_description</robot_param>
+      <robot_param_node>robot_state_publisher</robot_param_node>
+      <parameters>CONTROLLER_CONFIG_PATH</parameters>
+    </plugin>
+  </gazebo>
+
+  <!-- Joint dynamics for Gazebo -->
+  <gazebo reference="shoulder_pan_joint">
+    <implicitSpringDamper>true</implicitSpringDamper>
+  </gazebo>
+  <gazebo reference="shoulder_lift_joint">
+    <implicitSpringDamper>true</implicitSpringDamper>
+  </gazebo>
+  <gazebo reference="elbow_joint">
+    <implicitSpringDamper>true</implicitSpringDamper>
+  </gazebo>
+  <gazebo reference="wrist_1_joint">
+    <implicitSpringDamper>true</implicitSpringDamper>
+  </gazebo>
+  <gazebo reference="wrist_2_joint">
+    <implicitSpringDamper>true</implicitSpringDamper>
+  </gazebo>
+  <gazebo reference="gripper_left_joint">
+    <implicitSpringDamper>true</implicitSpringDamper>
+  </gazebo>
+  <gazebo reference="gripper_right_joint">
+    <implicitSpringDamper>true</implicitSpringDamper>
+  </gazebo>
 
 </robot>

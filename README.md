@@ -44,9 +44,14 @@ MOGI-ROS week 3-4 gazebo integration section
 1. “”” what controller node we use to control robotic models inside the gazebo ? Is robotic arm control implemented right in the gazebo gui? is teleop_… ?
 - commit: in Gazebo controlled the robotic arm's joints using Joint Position Controller gui plugin, replaced mock objects simulated it’s interacting with mock 3d objects
 
+
+
+
 1. “”” how to control the robotic model inside the gazebo using ros2_control? via the ros-bridge?
 2. implement the ros2_control of the gazebo model
-- commit: controlled model of a robot in Gazebo with ros2_control via a bridge
+- commit: controlled model of a robot in Gazebo with ros2_control
+
+
 
 1. control the ros2_control itself with higher level sequence of positional commands (moveit2-like) from a file (later this will be a topic with messages: for now- file with hardcoded timestamps)
 - commit: coded a time-relative control of a robot in Gazebo
@@ -289,7 +294,7 @@ ros2 launch robot_description spawn_robot.launch.py
 
 
 
-# control of the robotic model in Gazebo
+# GUI plugin based control of the robotic model in Gazebo
 
 User Input (GUI/script/MoveIt2)
     Joint Position Control gui plugin (in 3-dots menu)
@@ -309,20 +314,159 @@ User Input (GUI/script/MoveIt2)
 └─────────────────────────────────────────────────────────────┘
 
 
+# ros2_control based control of the robotic model in Gazebo
+
+## gz_ros2_control plugin
+┌─────────────────────────────────────────────────────────────────────┐
+│                         ROS2 SIDE                                   │
+│                                                                     │
+│   Your Code / MoveIt2 / CLI                                         │
+│         │                                                           │
+│         ▼  (publishes to /joint_trajectory_controller/...)          │
+│   joint_trajectory_controller                                       │
+│         │                                                           │
+│         ▼                                                           │
+│   controller_manager (manages all controllers)                      │
+│         │                                                           │
+│         ▼  (hardware_interface API)                                 │
+├─────────────────────────────────────────────────────────────────────┤
+│                         GAZEBO SIDE                                 │
+│                                                                     │
+│   gz_ros2_control plugin (loaded inside Gazebo)                     │
+│         │                                                           │
+│         ▼  (applies forces/positions to joints)                     │
+│   Gazebo Physics Engine                                             │
+└─────────────────────────────────────────────────────────────────────┘
 
 
-# ros-humble-ros-gz bridge
-sudo apt install ros-humble-ros-gz
+# ros2_control simulation
 
-ros_gz_bridge = Generic message translator between ROS2 ↔ Gazebo
-Clock synchronization
-Sensor data (cameras, lidar)
-Simple commands (cmd_vel for mobile robots)
-Does NOT handle joint control for arms
+```bash
+# Install ros2_control dependencies
+sudo apt install ros-humble-ros2-control ros-humble-ros2-controllers ros-humble-gz-ros2-control
 
-# gz_ros2_control plugin
+# Build and launch
+cd ~/ros2_ws
+rosdep install --from-paths src --ignore-src -r -y
+colcon build --packages-select robot_description
+source install/setup.bash
+ros2 launch robot_description ros2_control_sim.launch.py
+```
 
-ros2_control + gz_ros2_control = Joint control system
-gz_ros2_control plugin runs inside Gazebo, interfaces with simulated joints
-controller_manager loads controllers
-Controllers (e.g., joint_trajectory_controller) receive commands and move joints
+## ros2_control commands
+
+```bash
+# List controllers and their state
+ros2 control list_controllers
+
+# List hardware interfaces
+ros2 control list_hardware_interfaces
+
+# Check controller_manager status
+ros2 control list_controller_types
+
+# Send trajectory command to arm (move to position)
+ros2 action send_goal /arm_controller/follow_joint_trajectory \
+  control_msgs/action/FollowJointTrajectory "{
+    trajectory: {
+      joint_names: [shoulder_pan_joint, shoulder_lift_joint, elbow_joint, wrist_1_joint, wrist_2_joint],
+      points: [
+        {positions: [0.5, 0.3, -0.5, 0.2, 0.0], time_from_start: {sec: 2}}
+      ]
+    }
+  }"
+
+# Control gripper (open/close)
+ros2 action send_goal /gripper_controller/gripper_cmd \
+  control_msgs/action/GripperCommand "{
+    command: {position: 0.02, max_effort: 10.0}
+  }"
+
+# Topic-based control (alternative to action)
+ros2 topic pub --once /arm_controller/joint_trajectory \
+  trajectory_msgs/msg/JointTrajectory "{
+    joint_names: [shoulder_pan_joint, shoulder_lift_joint, elbow_joint, wrist_1_joint, wrist_2_joint],
+    points: [{positions: [0.0, 0.0, 0.0, 0.0, 0.0], time_from_start: {sec: 2}}]
+  }"
+```
+
+
+# Monitoring
+*monitor all data flowing through the system using ROS2 CLI tool*
+```bash
+# List all topics
+ros2 topic list
+
+# List topics with their message types
+ros2 topic list -t
+
+# See publishing frequency of a topic
+ros2 topic hz /joint_states
+
+# See the actual data being published
+ros2 topic echo /joint_states
+
+# See bandwidth usage
+ros2 topic bw /joint_states
+
+# Get info about a topic (publishers, subscribers, type)
+ros2 topic info /joint_states -v
+```
+
+## topics of ros2_control control of model in gazebo
+`artem@LAPTOP-15QP4R2F:~/ros2_ws$ ros2 topic list`
+/arm_controller/controller_state
+/arm_controller/joint_trajectory
+/arm_controller/state
+/arm_controller/transition_event
+/clock
+/dynamic_joint_states
+/gripper_controller/transition_event
+/joint_state_broadcaster/transition_event
+/joint_states
+/parameter_events
+/robot_description
+/rosout
+/tf
+/tf_static
+
+
+# ROS2 Communication Patterns
+                Is it a long-running task?
+                        │
+            ┌────────────┴────────────┐
+            │ YES                     │ NO
+            ▼                         ▼
+        Use ACTION              Need response?
+(motion, navigation)              │
+                        ┌─────────┴─────────┐
+                        │ YES               │ NO
+                        ▼                   ▼
+                    Use SERVICE          Use TOPIC
+                (config, query)     (sensors, state)
+
+# Action-based control
+An action is actually built from 3 services + 2 topics:
+/arm_controller/follow_joint_trajectory/
+├── _action/send_goal        (Service)  - Send goal
+├── _action/cancel_goal      (Service)  - Cancel request  
+├── _action/get_result       (Service)  - Get final result
+├── _action/feedback         (Topic)    - Progress updates
+└── _action/status           (Topic)    - Goal status
+
+this command contains everything needed for an action and if we want to implement some complex logic: we just need to code a node that will generate such commands and send them at pre-defined frequency 
+
+```bash
+ros2 action send_goal /arm_controller/follow_joint_trajectory \
+  control_msgs/action/FollowJointTrajectory "{
+    trajectory: {
+      joint_names: [shoulder_pan_joint, shoulder_lift_joint, elbow_joint, wrist_1_joint, wrist_2_joint],
+      points: [
+        {positions: [0.5, 0.3, -0.5, 0.2, 0.0], time_from_start: {sec: 2}}
+      ]
+    }
+  }"
+```
+
+
+# Topic-based control
