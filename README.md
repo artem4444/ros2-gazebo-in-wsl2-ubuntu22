@@ -57,6 +57,17 @@ MOGI-ROS week 3-4 gazebo integration section
 - commit: coded a time-relative control of a robot in Gazebo
 
 
+## 03.02
+
+- what the Python node controlled: trajectory of end-effector only? When it runs- What controls trajectories of each of the joints?
+- find phd video: how we plan pick-place actions in ros2: vision, tactile sensors
+
+1. chosen a high-level control framework
+2. connected it to ros2_control using recommended communication pattern (actions/services/topics based)
+- commit: the setup took {available level of abstraction} commands and completed control of robotic arm model doing a pick-place action on a mock object inside the gazebo simulation
+
+
+
 
 # Testing a newly installed Ubuntu22
 
@@ -445,7 +456,10 @@ ros2 topic info /joint_states -v
                     Use SERVICE          Use TOPIC
                 (config, query)     (sensors, state)
 
+
 # Action-based control
+
+## Actions in ROS2 Midleware
 An action is actually built from 3 services + 2 topics:
 /arm_controller/follow_joint_trajectory/
 ├── _action/send_goal        (Service)  - Send goal
@@ -454,6 +468,33 @@ An action is actually built from 3 services + 2 topics:
 ├── _action/feedback         (Topic)    - Progress updates
 └── _action/status           (Topic)    - Goal status
 
+why we can `ros2 action list`
+actions still work at some frequency: and topics are mantained even between those actions are sent
+┌─────────────────────────────────────────────────────────────────┐
+│              ACTION SERVER (always running)                      │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  /_action/status topic    →  publishes at ~1 Hz         │    │
+│  │  (always active, even with no goals)                    │    │
+│  │                                                          │    │
+│  │  Status: "No active goals" / "Goal executing" / etc.    │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  /_action/feedback topic  →  publishes during execution │    │
+│  │  (10-50 Hz while goal is active)                        │    │
+│  │                                                          │    │
+│  │  "Current position: [0.2, 0.3, ...]"                    │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  Services: send_goal, cancel_goal, get_result           │    │
+│  │  (always available, waiting for requests)               │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+
+
+## example of Action CLI command
 this command contains everything needed for an action and if we want to implement some complex logic: we just need to code a node that will generate such commands and send them at pre-defined frequency 
 
 ```bash
@@ -468,5 +509,27 @@ ros2 action send_goal /arm_controller/follow_joint_trajectory \
   }"
 ```
 
+Your CLI command
+    │
+    ▼
+ros2 action send_goal /arm_controller/follow_joint_trajectory ...
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────┐
+│  arm_controller                                             │
+│  (type: joint_trajectory_controller/JointTrajectoryController)
+│                                                             │
+│  Action Server: /arm_controller/follow_joint_trajectory     │
+│  Action Type:   control_msgs/action/FollowJointTrajectory   │
+└─────────────────────────────────────────────────────────────┘
+
+
 
 # Topic-based control
+
+
+
+
+# high-level control framework
+pick and place using moveit2 with perception by Automatic Addison channel
+
