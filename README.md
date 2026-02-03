@@ -533,3 +533,50 @@ ros2 action send_goal /arm_controller/follow_joint_trajectory ...
 # high-level control framework
 pick and place using moveit2 with perception by Automatic Addison channel
 
+
+# moveit2
+installing moveit2 and testing it in rviz with urdf from robot_description
+
+If you add MoveIt2 packages as dependencies in your package.xml, rosdep will resolve and install them
+
+## testing moveit2 in rviz2 with panda config (standard robotic arm)
+displays - MotionPlanning - Planning - Planning group
+
+the point of MotionPlanning tool is to calculate IK for the position of the EE i defined by manually dragging it with the cursor, and to render new joint positions in the rviz gui
+
+
+# Moveit2 config
+*MoveIt2 config package holds everything MoveIt needs to plan and (optionally) execute for your robot: robot model, groups, limits, planners, and controllers. It does not replace your URDF; it adds semantic and planning data on top of it.*
+
+```
+arm_5dof_moveit_config/
+├── .setup_assistant          # Used by Setup Assistant to know URDF/SRDF paths
+├── config/                   # YAML and RViz configs
+│   ├── arm_5dof.srdf         # Semantic: groups, EE, collisions, poses
+│   ├── joint_limits.yaml      # Overrides / extra limits for planning
+│   ├── kinematics.yaml       # IK solver (e.g. KDL) per group
+│   ├── moveit_controllers.yaml  # Controllers MoveIt uses for execution
+│   ├── moveit.rviz           # RViz layout + MotionPlanning display
+│   ├── ompl_planning.yaml    # (if present) OMPL planner tuning
+│   └── pilz_cartesian_limits.yaml  # Pilz LIN/PTP/CIRC limits
+└── launch/                   # Launch files
+    ├── demo.launch.py        # RViz demo (no real hardware)
+    ├── move_group.launch.py  # Starts move_group node
+    ├── moveit_rviz.launch.py # RViz with MoveIt config
+    ├── rsp.launch.py         # robot_state_publisher
+    ├── spawn_controllers.launch.py  # Spawn ros2_control controllers
+    └── ...
+```
+
+## MoveIt config package for 5-DOF arm form robot_description
+
+Moveit Setup Assistent gui tool
+
+```bash
+cd /home/artem/ros2_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch arm_5dof_moveit_config demo.launch.py
+```
+
+
