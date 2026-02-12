@@ -28,6 +28,9 @@ setup(
     entry_points={
         'console_scripts': [
             'pick_and_place = pick_and_place.pick_and_place_node:main',
+            'moveit_high_level_node = pick_and_place.moveit_high_level_node:main',
+            'controller_rate_monitor_node = pick_and_place.controller_rate_monitor_node:main',
+            'moveit_send_goal_example = pick_and_place.moveit_send_goal_example:main',
         ],
     },
 )

@@ -21,8 +21,13 @@ if(BUILD_TESTING)
 endif()
 
 install(
-  DIRECTORY urdf meshes rviz launch config worlds models
+  DIRECTORY urdf meshes rviz launch config worlds models scripts
   DESTINATION share/${PROJECT_NAME}
+)
+# Install bridge script as executable so launch can run it from share path
+install(
+  PROGRAMS scripts/joint_state_gui_bridge.py
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 ament_package()

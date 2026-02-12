@@ -13,6 +13,10 @@
   <depend>xacro</depend>
   <depend>robot_state_publisher</depend>
   <depend>joint_state_publisher_gui</depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>control_msgs</exec_depend>
+  <exec_depend>trajectory_msgs</exec_depend>
 
   <!-- for gazebo simulation -->
   <depend>ros_gz_sim</depend>

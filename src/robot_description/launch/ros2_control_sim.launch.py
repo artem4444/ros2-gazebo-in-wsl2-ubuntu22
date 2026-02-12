@@ -1,4 +1,6 @@
 """
+ros2 launch robot_description ros2_control_sim.launch.py
+
 Launch file for ros2_control simulation with Gazebo Harmonic.
 
 This launch file:
@@ -10,9 +12,11 @@ This launch file:
 """
 
 import os
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
+    ExecuteProcess,
     IncludeLaunchDescription,
     SetEnvironmentVariable,
     RegisterEventHandler,
@@ -33,8 +37,8 @@ def generate_launch_description():
     pkg_robot_description = FindPackageShare('robot_description')
     pkg_ros_gz_sim = FindPackageShare('ros_gz_sim')
     
-    # Get package share directory for file paths
-    pkg_share = FindPackageShare('robot_description').find('robot_description')
+    # Get package share directory for file paths (must be resolved string for URDF/config)
+    pkg_share = get_package_share_directory('robot_description')
     urdf_file = os.path.join(pkg_share, 'urdf', 'robot.urdf')
     controllers_file = os.path.join(pkg_share, 'config', 'ros2_controllers.yaml')
     
@@ -108,6 +112,11 @@ def generate_launch_description():
         ],
         output='screen'
     )
+    # Delay spawn so Gazebo world is fully loaded; avoids gz_ros2_control plugin init race
+    delayed_spawn = TimerAction(
+        period=4.0,
+        actions=[spawn_robot],
+    )
 
     # ==================== ROS2 CONTROL ====================
     # Spawn joint_state_broadcaster - publishes joint states from Gazebo to /joint_states
@@ -143,6 +152,29 @@ def generate_launch_description():
         output='screen',
     )
 
+    # ==================== JOINT STATE GUI + BRIDGE ====================
+    # GUI publishes to joint_states_desired (remapped) so it doesn't conflict with
+    # joint_state_broadcaster on /joint_states. Bridge forwards desired -> arm + gripper controllers.
+    joint_state_publisher_gui = Node(
+        package='joint_state_publisher_gui',
+        executable='joint_state_publisher_gui',
+        name='joint_state_publisher_gui',
+        output='screen',
+        remappings=[('joint_states', 'joint_states_desired')],
+        parameters=[{'use_sim_time': True}],
+    )
+    # Run bridge from share path (works even if lib/ install is missing)
+    bridge_script = os.path.join(
+        get_package_share_directory('robot_description'),
+        'scripts',
+        'joint_state_gui_bridge.py',
+    )
+    joint_state_gui_bridge = ExecuteProcess(
+        cmd=['python3', bridge_script, '--ros-args', '-p', 'use_sim_time:=true'],
+        name='joint_state_gui_bridge',
+        output='screen',
+    )
+
     # ==================== BRIDGES ====================
     # Bridge for clock (Gazebo -> ROS2)
     clock_bridge = Node(
@@ -153,10 +185,9 @@ def generate_launch_description():
     )
 
     # ==================== EVENT HANDLERS ====================
-    # Wait for spawn to complete before starting controllers
-    # Controllers need the robot to be spawned first
+    # Wait for spawn to complete and gz_ros2_control plugin to init before starting controllers
     delayed_controller_spawner = TimerAction(
-        period=5.0,  # Wait 5 seconds after launch for robot to spawn and plugin to initialize
+        period=10.0,  # After delayed_spawn (4s) + time for spawn + plugin/controller_manager init
         actions=[
             joint_state_broadcaster_spawner,
         ]
@@ -188,9 +219,12 @@ def generate_launch_description():
         z_arg,
         # Gazebo
         gazebo,
-        # Robot
+        # Robot (spawn after Gazebo world is ready)
         robot_state_publisher,
-        spawn_robot,
+        delayed_spawn,
+        # Sliders: GUI -> joint_states_desired; bridge -> arm_controller + gripper_controller
+        joint_state_publisher_gui,
+        joint_state_gui_bridge,
         # Bridges
         clock_bridge,
         # Controllers (delayed and chained)

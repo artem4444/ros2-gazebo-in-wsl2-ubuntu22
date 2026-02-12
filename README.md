@@ -68,6 +68,28 @@ MOGI-ROS week 3-4 gazebo integration section
 
 
 
+## 10.02
+- Nodes between moveit and data in frames, that is from perception sensors: tactile, lidar etc :: what these nodes are supposed to translate that data into, for moveit?
+
+- ros2 actions list: where ros2_control gets high level commands from?
+- When I connect moveit to ros2_control : I configure moveit to send those actions at a rate via the moveit config package?
+
+
+ros2_control controllers take action and executes them, when joint_state_publisher_gui is not interrupting
+/arm_controller/follow_joint_trajectory [control_msgs/action/FollowJointTrajectory]
+/gripper_controller/gripper_cmd [control_msgs/action/GripperCommand]
+
+
+## 11.02
+1. defined moveit2 output format
+2. integrated moveit2 output actions to ros2 controllers
+- tested moveit2 - ros2 controllers control pipeline of the model in gazebo
+
+1. “”” what data from sensors that’s is used in ros2 controllers? how it is used?
+2. defined data structures, in which perception nodes must translate data for moveit2
+
+
+
 
 # Testing a newly installed Ubuntu22
 
@@ -424,6 +446,22 @@ ros2 topic bw /joint_states
 ros2 topic info /joint_states -v
 ```
 
+## Troubleshooting: position commands not executing in Gazebo
+
+If `ros2 action send_goal /arm_controller/follow_joint_trajectory ...` is accepted but the model in Gazebo does not move:
+
+1. **Sim time**: The controller_manager and arm_controller must use simulation time. In `config/ros2_controllers.yaml` ensure `use_sim_time: true` is set under both `controller_manager.ros__parameters` and `arm_controller.ros__parameters`. Without this, trajectory timing does not follow `/clock` and the trajectory may never run.
+
+2. **Do not cancel**: Let the goal run for the full trajectory duration (e.g. 2 seconds). Pressing Ctrl+C cancels the goal and stops execution.
+
+3. **Verify `/clock`**: Run `ros2 topic hz /clock` while Gazebo is running; it should publish. The launch file bridges Gazebo clock to ROS 2.
+
+4. **Verify joint state updates**: While sending a goal, run `ros2 topic echo /joint_states`. If arm joint positions do not change, commands are not reaching the hardware interface (check controller activation and config path). If they change but the model does not move in Gazebo, the issue is in gz_ros2_control or the simulation.
+
+5. **Controller config path**: The launch file passes the full path to `ros2_controllers.yaml` into the URDF so the gz_ros2_control plugin can load it. The launch uses `get_package_share_directory('robot_description')` so the path resolves correctly from the install space.
+
+6. **Launch timing**: The spawn is delayed 4 s so the Gazebo world is ready; controllers are started 10 s after launch. Wait until you see the arm_controller and gripper_controller reported as **active** (e.g. `ros2 control list_controllers`) before sending action goals. Sending a goal before the controller_manager and gz_ros2_control plugin are ready can result in accepted goals that never move the robot.
+
 ## topics of ros2_control control of model in gazebo
 `artem@LAPTOP-15QP4R2F:~/ros2_ws$ ros2 topic list`
 /arm_controller/controller_state
@@ -525,16 +563,11 @@ ros2 action send_goal /arm_controller/follow_joint_trajectory ...
 
 
 
-# Topic-based control
 
 
+# moveit2 installation
+  moveit2 is a frameworks with many nodes, topics etc
 
-
-# high-level control framework
-pick and place using moveit2 with perception by Automatic Addison channel
-
-
-# moveit2
 installing moveit2 and testing it in rviz with urdf from robot_description
 
 If you add MoveIt2 packages as dependencies in your package.xml, rosdep will resolve and install them
@@ -545,7 +578,7 @@ displays - MotionPlanning - Planning - Planning group
 the point of MotionPlanning tool is to calculate IK for the position of the EE i defined by manually dragging it with the cursor, and to render new joint positions in the rviz gui
 
 
-# Moveit2 config
+# moveit2 config
 *MoveIt2 config package holds everything MoveIt needs to plan and (optionally) execute for your robot: robot model, groups, limits, planners, and controllers. It does not replace your URDF; it adds semantic and planning data on top of it.*
 
 ```
@@ -568,7 +601,7 @@ arm_5dof_moveit_config/
     └── ...
 ```
 
-## MoveIt config package for 5-DOF arm form robot_description
+## moveit2 config package for 5-DOF arm form robot_description
 
 Moveit Setup Assistent gui tool
 
@@ -580,3 +613,93 @@ ros2 launch arm_5dof_moveit_config demo.launch.py
 ```
 
 
+
+# *moveit2 connection to ros2_control*
+
+moveit2 to ros2_control connection is similar in gz_ros2_control implementation and in real deployment, where ros2_contorl control real hardware via hardware_interface plugin
+
+**In production, the MoveIt2 → ros2_control connection should be action-based**
+format: yaml string 
+
+
+*Broadcasters = ros2_control controllers that only read state (sensor) interfaces and publish them — same idea as joint_state_broadcaster, but for other sensors.*
+Broadcasters (read state → publish topics)
+Controller	State it reads	Publishes
+joint_state_broadcaster	Joint position, velocity, effort	sensor_msgs/msg/JointState → /joint_states
+ForceTorqueBroadcaster	Force/torque at a joint/link	geometry_msgs/msg/WrenchStamped (or similar)
+IMUSensorBroadcaster	Orientation, angular velocity, linear acceleration	sensor_msgs/msg/Imu
+RangeSensorBroadcaster	Range (e.g. sonar, ToF)	sensor_msgs/msg/Range
+CartesianStateBroadcaster	Cartesian pose/velocity (e.g. from model/FK)	Cartesian state topic
+
+
+## command ros2 controllers with moveit2 from rviz2 planning display
+
+Rebuild:
+   cd ~/ros2_ws && colcon build --packages-select arm_5dof_moveit_config pick_and_place   source install/setup.bash
+Terminal 1 – Sim + move_group:
+   ros2 launch pick_and_place pick_and_place.launch.py
+Wait until Gazebo and the robot are up (~15 s).
+Terminal 2 – RViz with sim time:
+   ros2 launch arm_5dof_moveit_config moveit_rviz.launch.py use_sim_time:=true
+In RViz: set Fixed Frame to world or base_link, set a goal with the MotionPlanning interactive marker, then click Plan and Execute. The arm in Gazebo should move.
+If Plan or Execute still fail, check:
+Fixed Frame in RViz matches a frame from your sim (e.g. world or base_link).
+/joint_states is published: ros2 topic echo /joint_states --once
+/move_action exists: ros2 action list | grep move_action
+/arm_controller/follow_joint_trajectory exists: ros2 action list | grep follow_joint_trajectory
+
+
+# high-level control framework
+pick and place using moveit2 with perception 
+
+## How to send a MoveIt goal
+
+1. **RViz (MotionPlanning plugin)**  
+   Launch sim + MoveIt2, open RViz with the MoveIt MotionPlanning panel. Set the goal with the interactive marker, then click **Plan** and **Execute**. MoveIt sends goals to `/move_action` and trajectories to `/arm_controller/follow_joint_trajectory`.
+
+2. **Python (joint-space goal)**  
+   Use the example script that sends a `MoveGroup` goal to `/move_action`:
+   ```bash
+   # With sim and move_group already running (e.g. ros2 launch pick_and_place pick_and_place.launch.py)
+   ros2 run pick_and_place moveit_send_goal_example                    # default: home pose
+   ros2 run pick_and_place moveit_send_goal_example -- 0.0 0.5 -0.8 0.3 0.0   # custom joint positions (rad)
+   ```
+   Joint order: `shoulder_pan_joint`, `shoulder_lift_joint`, `elbow_joint`, `wrist_1_joint`, `wrist_2_joint`.
+
+3. **From your own node**  
+   Create an `ActionClient` for `moveit_msgs/action/MoveGroup` with action name `/move_action`. Build a `MoveGroup.Goal` with `request.group_name = "arm"` and `request.goal_constraints` set to joint constraints (see `pick_and_place/moveit_send_goal_example.py`).
+
+
+ready manuals:
+- Automatic Addison channel
+
+
+
+
+# moveit2 with teleoperating package
+if i use teleoperation package: each time i send a teleoperation signal to moveit2: the previous set of joint trajectories gets interrupted and a new one is generated and passed to ros2 controllers by the moveit2 
+
+
+
+# moveit2 perception
+we publish messages with values retrieved by hardware interface from CAN frame
+rate = frequnecy of CAN network
+content ~= octomap required data
+
+
+
+
+
+
+# moveit2 - isaac sim
+we subsribe a node from Isaac Sim ActionGraph to moveit2 topic 
+
+we control moveit2 content from rviz2 using Planning Display (we set trajectories for several Planning Grouos to execute simultaneously)
+
+
+we can connect Unreal Engine the same way 
+
+
+## accessing ros2 topic from outside ros2 
+Isaac Sim has built‑in ROS 2 support (nodes, topics, actions). A node in the Isaac Sim ActionGraph can subscribe/publish directly to MoveIt2.
+Unreal does not speak ROS 2 by default. You need a ROS 2 bridge (plugin or separate process) so that Unreal can publish/subscribe to the same ROS 2 topics/actions that MoveIt2 uses.

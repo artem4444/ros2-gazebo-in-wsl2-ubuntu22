@@ -4,6 +4,7 @@
 controller_manager:
   ros__parameters:
     update_rate: 100  # Hz - controller update frequency
+    use_sim_time: true
 
     # List of controllers to load
     joint_state_broadcaster:
@@ -17,8 +18,10 @@ controller_manager:
 
 
 # Arm trajectory controller - controls 5 DOF arm joints
+# use_sim_time ensures trajectory timing follows /clock (required for Gazebo)
 arm_controller:
   ros__parameters:
+    use_sim_time: true
     joints:
       - shoulder_pan_joint
       - shoulder_lift_joint
