@@ -1,0 +1,15 @@
+# Bimanual merge-and-execute node parameters
+# Load with: --params-file config/bimanual_merge_params.yaml
+
+merge_execute_node:
+  ros__parameters:
+    # MoveIt planning group names (must match SRDF)
+    left_planning_group: "left_arm"
+    right_planning_group: "right_arm"
+    # Controller action names (absolute; must match ros2 action list)
+    left_controller_action: "/left_joint_trajectory_controller/follow_joint_trajectory"
+    right_controller_action: "/right_joint_trajectory_controller/follow_joint_trajectory"
+    # Resample time step for merging (seconds)
+    merge_dt: 0.02
+    # Named state to plan to: "hands_up" moves arms visibly; "home" is all zeros (no motion if already there)
+    plan_to_named_state: "hands_up"
